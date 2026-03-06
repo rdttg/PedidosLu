@@ -1,98 +1,182 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Link, useFocusEffect, useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+interface Pedido {
+  id: string;
+  nome: string;
+  valor: string;
+  descricao: string;
+  dataEntrega: string;
+  dataCadastro: string;
+  status: 'Pendente' | 'Entregue';
+  imagem: string | null;
+}
 
-export default function HomeScreen() {
+export default function ListaPedidos() {
+  const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [busca, setBusca] = useState('');
+  const router = useRouter();
+
+  const carregarPedidos = async () => {
+    try {
+      const dados = await AsyncStorage.getItem('@pedidos');
+      if (dados) setPedidos(JSON.parse(dados));
+    } catch (e) {
+      console.error("Erro ao carregar");
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      carregarPedidos();
+    }, [])
+  );
+
+  const alternarStatus = async (id: string) => {
+    const novosPedidos = pedidos.map(p => {
+      if (p.id === id) {
+        const novoStatus = p.status === 'Entregue' ? 'Pendente' : 'Entregue';
+        return { ...p, status: novoStatus as 'Entregue' | 'Pendente' };
+      }
+      return p;
+    });
+    setPedidos(novosPedidos);
+    await AsyncStorage.setItem('@pedidos', JSON.stringify(novosPedidos));
+  };
+
+  const excluirPedido = async (id: string) => {
+    const confirmar = window.confirm("Deseja realmente apagar este pedido?");
+    if (confirmar) {
+      const filtrados = pedidos.filter(p => p.id !== id);
+      setPedidos(filtrados);
+      await AsyncStorage.setItem('@pedidos', JSON.stringify(filtrados));
+    }
+  };
+
+
+  const pedidosFiltrados = pedidos.filter(p => 
+    p.nome.toLowerCase().includes(busca.toLowerCase())
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={styles.container}>
+      <Text style={styles.title}>🪵 Minhas Plaquinhas</Text>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      {}
+      <TextInput
+        style={styles.buscaInput}
+        placeholder="🔍 Buscar cliente..."
+        value={busca}
+        onChangeText={setBusca}
+      />
+      
+      <FlatList
+        data={pedidosFiltrados}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            {}
+            <View style={styles.imageContainer}>
+              {item.imagem ? (
+                <Image source={{ uri: item.imagem }} style={styles.miniatura} />
+              ) : (
+                <View style={[styles.miniatura, styles.semImagem]}>
+                  <Text style={{fontSize: 10, color: '#D2B48C'}}>S/ Foto</Text>
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity 
+              style={{ flex: 1, paddingLeft: 10 }} 
+              onPress={() => router.push({ pathname: '/cadastro', params: { id: item.id } })}
+            >
+              <Text style={styles.nomePedido} numberOfLines={1}>{item.nome}</Text>
+              <Text style={styles.texto}>💰 R$ {item.valor}</Text>
+              <Text style={styles.texto}>📅 {item.dataEntrega}</Text>
+              <Text style={item.status === 'Entregue' ? styles.entregue : styles.pendente}>
+                ● {item.status}
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.painelAcoes}>
+              <TouchableOpacity 
+                style={[styles.btnAcao, { backgroundColor: item.status === 'Entregue' ? '#666' : '#2E7D32' }]} 
+                onPress={() => alternarStatus(item.id)}
+              >
+                <Text style={styles.btnAcaoTexto}>
+                  {item.status === 'Entregue' ? 'Voltar' : 'Concluir'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.btnAcao, { backgroundColor: '#d32f2f', marginTop: 5 }]} 
+                onPress={() => excluirPedido(item.id)}
+              >
+                <Text style={styles.btnAcaoTexto}>Excluir</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        ListEmptyComponent={<Text style={styles.vazio}>Nenhum pedido encontrado.</Text>}
+      />
+
+      <Link href={"/cadastro" as any} asChild>
+        <TouchableOpacity style={styles.fab}><Text style={styles.fabText}>+</Text></TouchableOpacity>
+      </Link>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: { flex: 1, padding: 20, backgroundColor: '#FDF5E6' },
+  title: { fontSize: 26, fontWeight: 'bold', marginBottom: 15, marginTop: 40, color: '#5D2E0A' },
+  buscaInput: { 
+    backgroundColor: '#fff', 
+    padding: 12, 
+    borderRadius: 10, 
+    marginBottom: 20, 
+    borderWidth: 1, 
+    borderColor: '#D2B48C',
+    fontSize: 16
+  },
+  card: { 
+    backgroundColor: '#fff', 
+    padding: 10, 
+    borderRadius: 12, 
+    marginBottom: 12, 
+    flexDirection: 'row', 
+    elevation: 3, 
+    alignItems: 'center' 
+  },
+  imageContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#F5F5F5'
+  },
+  miniatura: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  semImagem: {
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderStyle: 'dashed'
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
+  nomePedido: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+  texto: { color: '#666', fontSize: 12, marginVertical: 1 },
+  entregue: { color: '#2E7D32', fontWeight: 'bold', fontSize: 11 },
+  pendente: { color: '#EF6C00', fontWeight: 'bold', fontSize: 11 },
+  painelAcoes: { marginLeft: 5 },
+  btnAcao: { paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6, minWidth: 75, alignItems: 'center' },
+  btnAcaoTexto: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  fab: { position: 'absolute', right: 25, bottom: 25, backgroundColor: '#8B4513', width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
+  fabText: { color: '#fff', fontSize: 30 },
+  vazio: { textAlign: 'center', marginTop: 50, color: '#999' }
 });
