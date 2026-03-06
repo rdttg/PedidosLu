@@ -21,7 +21,7 @@ export default function ListaPedidos() {
 
   const carregarPedidos = async () => {
     try {
-      const dados = await AsyncStorage.getItem('@pedidos');
+      const dados = await AsyncStorage.getItem('@pedidos'); //a
       if (dados) setPedidos(JSON.parse(dados));
     } catch (e) {
       console.error("Erro ao carregar");
